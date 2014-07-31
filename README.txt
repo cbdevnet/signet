@@ -10,9 +10,9 @@ numerous calls to gpg itself.
 
 GOAL
 ----
-Have an easy way to sign keys on online as
-offline machines, by allowing import and
-export by multiple methods (eg. files,
+Have an easy way to sign keys on online as well
+as airgapped/offline machines, by allowing import 
+and export by multiple methods (eg. files,
 key servers)
 
 BASIC OPERATION
