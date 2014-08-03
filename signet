@@ -7,8 +7,9 @@ remove_sigs () {
 }
 
 sign_uid () {
+	printf "Invoking GPG in order to sign key %s UID %s (%s) with key %s\n" "$2" "$3" "$4" "$1"
 	#GPG does its own user sanity check
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --keyring $PRIVATE_SIGNER_KEYRING  --edit-key $1 uid $2 sign save < /dev/tty
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --keyring $PRIVATE_SIGNER_KEYRING --default-key $1 --edit-key $2 uid $3 sign save < /dev/tty
 	#TODO: Display UID status here
 #	printf "Do you want to sign\n\tKey %s UID %s\n\t%s\nwith your key (y/n)? " "$1" "$2" "$3"
 #	read CONTINUE_SIGN < /dev/tty
@@ -24,19 +25,20 @@ sign_uid () {
 }
 
 sign_key () {
-	printf "Now processing key $1\n\n"
+	printf "Now processing key %s (Signerkey %s)\n\n" "$2" "$1"
 	printf "Minimizing key...\n"
-	remove_sigs $1
+	remove_sigs $2
 
 	#TODO: Show fingerprint and ask for match
 
 	current_uid=1
 
 	printf "Now processing UIDs\n"
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep ^[up][iu][db]: | while read uid; do
+	
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --with-colons --list-keys $2 | grep ^[up][iu][db]: | while read uid; do
 		uid_name=$(echo $uid | cut -d : -f 10)
 		uid_status=$(echo $uid | cut -d : -f 2)
-		sign_uid $1 $current_uid "$uid_name" "$uid_status"
+		sign_uid $1 $2 $current_uid "$uid_name" "$uid_status"
 		current_uid=$(expr $current_uid + 1)
 	done
 }
@@ -60,7 +62,7 @@ load_key_file (){
 	signee_fp=$(gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep pub | cut -d : -f 5)
 	printf "Detected imported fingerprint %s\n" "$signee_fp"
 
-	sign_key $signee_fp
+	sign_key $1 $signee_fp
 }
 
 load_key_net (){
@@ -82,7 +84,7 @@ load_key_net (){
 	signee_fp=$(gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep pub | cut -d : -f 5)
 	printf "Detected imported fingerprint %s\n" "$signee_fp"
 
-	sign_key $signee_fp
+	sign_key $1 $signee_fp
 }
 
 load_keyring () {
@@ -117,7 +119,7 @@ fi
 printf "Select signee source:\n\t(k)eyring\n\t(n)et\n\t(f)ile\n"
 read mode
 
-case $SIGNMODE in
+case $mode in
 	k) load_keyring $SIGNERKEY;;
 	n) load_key_net $SIGNERKEY;;
 	f) load_key_file $SIGNERKEY;;
