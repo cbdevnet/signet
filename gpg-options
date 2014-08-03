@@ -1,4 +1,12 @@
---quiet
---batch
---no-tty
---no-permission-warning
+--quiet				Try to be as quiet as possible.
+--batch				Never ask, do not allow interactive commands. gpg might still need to read from STDIN.
+--no-tty			TTY (terminal) is never used for any output.
+--fixed-list-mode		
+--no-permission-warning		Suppress the warning about unsafe file and home directory (--homedir) permissions.
+--fingerprint
+--keyid-format long
+--yes				Assume "yes" on most questions.
+--primary-keyring		Use as primary public keyring. Imported keys (via --import or keyserver --recv-from) will go to this keyring.
+--options file			Read options from file and do not try to read them from the default options file
+--trusted-key longID		Assume that the specified key is as trustworthy as one of your own secret keys.
+--no-greeting			Suppress the initial copyright message. 
