@@ -1,0 +1,4 @@
+--quiet
+--batch
+--no-tty
+--no-permission-warning

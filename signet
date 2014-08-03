@@ -13,7 +13,7 @@ sign_uid () {
 	gpg --homedir $SIGNET_TEMP_DIR --ask-cert-level --no-default-keyring --keyring $TEMPORARY_KEYRING --secret-keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --default-key $1 --edit-key $2 uid $3 sign save < /dev/tty
 
 	printf "GPG exit code %s\n" "$?"
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --export --armor $2 > $SIGNET_OUTPUT_DIR/$2_UID$3.sig.asc
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --no-emit-version --export --armor $2 > $SIGNET_OUTPUT_DIR/$2_UID$3.sig.asc
 	remove_sigs $2
 }
 
@@ -89,7 +89,6 @@ printf "Signet v0.1 - Welcome\n"
 printf "Setting up environment...\n"
 chmod 700 $SIGNET_TEMP_DIR
 rm $SIGNET_TEMP_DIR/* > /dev/null
-#FIXME: need to import signer key as owner-trusted for signing, but also need public key in some active keyring
 #gpg --no-default-keyring --keyring $PRIVATE_SIGNER_KEYRING --export-ownertrust | gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $PRIVATE_SIGNER_KEYRING --import-ownertrust
 
 printf "\nAvailable signing keys:\n"
