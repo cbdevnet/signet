@@ -8,12 +8,22 @@ remove_sigs () {
 
 sign_uid () {
 	clear
+
+	if [ -n "$SIGNING_POLICY_URL" ]; then
+		gpgopts="--sig-policy-url $SIGNING_POLICY_URL "
+	fi
+
+	if [ "$USE_CERT_LEVELS" = "y" ]; then
+		gpgopts="$gpgopts --ask-cert-level"
+	fi
+
 	printf "Invoking GPG in order to sign key %s UID %s (%s) with key %s\n" "$2" "$3" "$4" "$1"
 	#GPG does its own user sanity check
-	gpg --homedir $SIGNET_TEMP_DIR --ask-cert-level --no-default-keyring --keyring $TEMPORARY_KEYRING --secret-keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --default-key $1 --edit-key $2 uid $3 sign save < /dev/tty
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --secret-keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --default-key $1 $gpgopts --edit-key $2 uid $3 sign save < /dev/tty
 
 	printf "GPG exit code %s\n" "$?"
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --no-emit-version --export --armor $2 > $SIGNET_OUTPUT_DIR/$2_UID$3.sig.asc
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --no-emit-version --export --armor $2 > $SIGNET_OUTPUT_DIR/$2_UID$3_by_$1.sig
+	sleep 3
 	remove_sigs $2
 }
 
