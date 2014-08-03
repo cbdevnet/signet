@@ -2,96 +2,100 @@
 
 . ./signet.conf
 
-REMOVE_KEY_SIGS () {
+remove_sigs () {
 	printf "minimize\nsave\ny\n" | gpg --command-fd 0 --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --edit-key $1
 }
 
-SIGN_SINGLE_UID () {
+sign_uid () {
+	#GPG does its own user sanity check
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --keyring $PRIVATE_SIGNER_KEYRING  --edit-key $1 uid $2 sign save < /dev/tty
 	#TODO: Display UID status here
-	printf "Do you want to sign\n\tKey %s UID %s\n\t%s\nwith your key (y/n)? " "$1" "$2" "$3"
-	read CONTINUE_SIGN < /dev/tty
+#	printf "Do you want to sign\n\tKey %s UID %s\n\t%s\nwith your key (y/n)? " "$1" "$2" "$3"
+#	read CONTINUE_SIGN < /dev/tty
 
-	case $CONTINUE_SIGN in
-		y) printf "Signing this UID\n"
-		   #TODO Sign key, export signature, delete signature
-		   exit 0;;
-		*) printf "Skipping this UID\n"
-		   exit 1;;
-	esac
+#	case $CONTINUE_SIGN in
+#		y) printf "Signing this UID\n"
+#		   #TODO Sign key, export signature, delete signature
+#		   exit 0;;
+#		*) printf "Skipping this UID\n"
+#		   exit 1;;
+#	esac
+#TODO: save signature to $KEY-$UID_NAME-sig.asc, minimize key again
 }
 
-SIGN_SINGLE_KEY () {
+sign_key () {
 	printf "Now processing key $1\n\n"
 	printf "Minimizing key...\n"
-	REMOVE_KEY_SIGS $1
+	remove_sigs $1
 
 	#TODO: Show fingerprint and ask for match
 
-	CURRENT_UID=1
+	current_uid=1
 
 	printf "Now processing UIDs\n"
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep ^[up][iu][db]: | while read UID; do
-		UID_NAME=$(echo $UID | cut -d : -f 10)
-		UID_STATUS=$(echo $UID | cut -d : -f 2)
-		SIGN_SINGLE_UID $1 $CURRENT_UID "$UID_NAME" "$UID_STATUS"
-		CURRENT_UID=$(expr $CURRENT_UID + 1)
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep ^[up][iu][db]: | while read uid; do
+		uid_name=$(echo $uid | cut -d : -f 10)
+		uid_status=$(echo $uid | cut -d : -f 2)
+		sign_uid $1 $current_uid "$uid_name" "$uid_status"
+		current_uid=$(expr $current_uid + 1)
 	done
 }
 
-LOAD_KEY_FILE (){
+load_key_file (){
 	printf "Enter path to signee public key: "
-	read SIGNEE_FILE
+	read key_file
 
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --import-options import-minimal --import $SIGNEE_FILE
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --import-options import-minimal --import $key_file
 	if [ "$?" = "0" ]; then
 		printf "Signee key seems to have been imported successfully\n"
 	else
 		printf "GPG reported an error importing the key. Abort? (y/n): "
-		read ABORT
-		if [ "$ABORT" = "y" ]; then
+		read action
+		if [ "$action" = "y" ]; then
 			exit 5
 		fi
 	fi
 
 	#Get imported key ID
-	SIGNEE_FINGERPRINT=$(gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep pub | cut -d : -f 5)
-	printf "Detected imported fingerprint %s\n" "$SIGNEE_FINGERPRINT"
+	signee_fp=$(gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep pub | cut -d : -f 5)
+	printf "Detected imported fingerprint %s\n" "$signee_fp"
 
-	SIGN_SINGLE_KEY $SIGNEE_FINGERPRINT
+	sign_key $signee_fp
 }
 
-LOAD_KEY_NET (){
+load_key_net (){
 	printf "Enter signee key fingerprint: "
-	read SIGNEE_FINGERPRINT
+	read signee_fp
 
 	#FIXME: import-options seems to not work with recv-keys
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --import-options import-minimal --keyserver $KEY_SERVER --recv-keys $SIGNEE_FINGERPRINT
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --import-options import-minimal --keyserver $KEY_SERVER --recv-keys $signee_fp
 	if [ "$?" = "0" ]; then
 		printf "Signee key seems to have been imported successfully.\n"	
 	else
 		printf "GPG reported an error fetching/importing the key. Abort? (y/n): "
-		read ABORT
-		if [ "$ABORT" = "y" ]; then
+		read action
+		if [ "$action" = "y" ]; then
 			exit 5
 		fi
 	fi
 
-	SIGNEE_FINGERPRINT=$(gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep pub | cut -d : -f 5)
-	printf "Detected imported fingerprint %s\n" "$SIGNEE_FINGERPRINT"
+	signee_fp=$(gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep pub | cut -d : -f 5)
+	printf "Detected imported fingerprint %s\n" "$signee_fp"
 
-	SIGN_SINGLE_KEY $SIGNEE_FINGERPRINT
+	sign_key $signee_fp
 }
 
-LOAD_KEYRING () {
+load_keyring () {
 	#TODO: Import keyring
 	printf "Importing entire keyring\n"
 }
-
 printf "Signet v0.1 - Welcome\n"
 
 printf "Setting up environment...\n"
 chmod 700 $SIGNET_TEMP_DIR
 rm $SIGNET_TEMP_DIR/* > /dev/null
+#FIXME: need to import signer key as owner-trusted for signing, but also need public key in some active keyring
+#gpg --no-default-keyring --keyring $PRIVATE_SIGNER_KEYRING --export-ownertrust | gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $PRIVATE_SIGNER_KEYRING --import-ownertrust
 
 printf "\nAvailable signing keys:\n"
 gpg --no-default-keyring --keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --list-secret-keys | grep "^sec[^#]" 
@@ -111,12 +115,12 @@ else
 fi
 
 printf "Select signee source:\n\t(k)eyring\n\t(n)et\n\t(f)ile\n"
-read SIGNMODE
+read mode
 
 case $SIGNMODE in
-	k) LOAD_KEYRING;;
-	n) LOAD_KEY_NET;;
-	f) LOAD_KEY_FILE;;
+	k) load_keyring $SIGNERKEY;;
+	n) load_key_net $SIGNERKEY;;
+	f) load_key_file $SIGNERKEY;;
 	*) printf "Could not determine signee source. Aborting.\n";
 	   exit 3;;
 esac
