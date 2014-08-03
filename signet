@@ -7,21 +7,14 @@ remove_sigs () {
 }
 
 sign_uid () {
+	clear
 	printf "Invoking GPG in order to sign key %s UID %s (%s) with key %s\n" "$2" "$3" "$4" "$1"
 	#GPG does its own user sanity check
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --keyring $PRIVATE_SIGNER_KEYRING --default-key $1 --edit-key $2 uid $3 sign save < /dev/tty
-	#TODO: Display UID status here
-#	printf "Do you want to sign\n\tKey %s UID %s\n\t%s\nwith your key (y/n)? " "$1" "$2" "$3"
-#	read CONTINUE_SIGN < /dev/tty
+	gpg --homedir $SIGNET_TEMP_DIR --ask-cert-level --no-default-keyring --keyring $TEMPORARY_KEYRING --secret-keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --default-key $1 --edit-key $2 uid $3 sign save < /dev/tty
 
-#	case $CONTINUE_SIGN in
-#		y) printf "Signing this UID\n"
-#		   #TODO Sign key, export signature, delete signature
-#		   exit 0;;
-#		*) printf "Skipping this UID\n"
-#		   exit 1;;
-#	esac
-#TODO: save signature to $KEY-$UID_NAME-sig.asc, minimize key again
+	printf "GPG exit code %s\n" "$?"
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --export --armor $2 > $SIGNET_OUTPUT_DIR/$2_UID$3.sig.asc
+	remove_sigs $2
 }
 
 sign_key () {
@@ -100,13 +93,13 @@ rm $SIGNET_TEMP_DIR/* > /dev/null
 #gpg --no-default-keyring --keyring $PRIVATE_SIGNER_KEYRING --export-ownertrust | gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $PRIVATE_SIGNER_KEYRING --import-ownertrust
 
 printf "\nAvailable signing keys:\n"
-gpg --no-default-keyring --keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --list-secret-keys | grep "^sec[^#]" 
+gpg --no-default-keyring --secret-keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --list-secret-keys | grep "^sec[^#]" 
 
 printf "\nEnter ID of key to use for signing: "
 read SIGNERKEY
 
 printf "\nSigner key details:\n"
-gpg --no-default-keyring --keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --list-secret-keys $SIGNERKEY
+gpg --no-default-keyring --secret-keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --list-secret-keys $SIGNERKEY
 
 
 if [ "$?" = "0" ]; then
