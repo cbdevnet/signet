@@ -105,10 +105,20 @@ load_keyring () {
 	printf "Transferring and minimizing keys...\n"
 	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$keyring" --export | gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --import-options import-minimal --import
 
+	if [ "$?" = "0" ]; then
+		printf "Import seems to have been successful\n"
+	else
+		printf "GPG reported an error importing the keyring. Abort? (y/n): "
+		read action
+		if [ "$action" = "y" ]; then
+			exit 5
+		fi
+	fi
+
 	printf "Iterating over keys...\n"
 	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --list-keys --with-colons | grep "^pub:" | cut -d : -f 5 | while read signee; do
 		sign_key $signee
-done
+	done
 }
 
 printf "Signet v0.1 - Welcome\n"
