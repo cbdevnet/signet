@@ -3,7 +3,13 @@
 . ./signet.conf
 
 remove_sigs () {
+	printf "Minimizing key...\n"
 	printf "minimize\nsave\ny\n" | gpg --command-fd 0 --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --edit-key $1
+}
+
+save_key () {
+	printf "Saving current status of key %s to %s\n" "$1" "$2"
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --no-emit-version --export --armor $1 > $SIGNET_OUTPUT_DIR/$2
 }
 
 sign_uid () {
@@ -17,20 +23,19 @@ sign_uid () {
 		gpgopts="$gpgopts --ask-cert-level"
 	fi
 
-	printf "Invoking GPG in order to sign key %s UID %s (%s) with key %s\n" "$2" "$3" "$4" "$1"
+	printf "Invoking GPG in order to sign key %s UID %s (%s) with key %s\n" "$1" "$2" "$3" "$SIGNERKEY"
 	#GPG does its own user sanity check
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --secret-keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --default-key $1 $gpgopts --edit-key $2 uid $3 sign save < /dev/tty
-
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --secret-keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --default-key "$SIGNERKEY" $gpgopts --edit-key "$1" uid "$2" sign save < /dev/tty
 	printf "GPG exit code %s\n" "$?"
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --no-emit-version --export --armor $2 > $SIGNET_OUTPUT_DIR/$2_UID$3_by_$1.sig
-	sleep 3
-	remove_sigs $2
+
+	save_key $1 $1_UID$2_by_$SIGNERKEY.sig
+	sleep 2
+	remove_sigs $1
 }
 
 sign_key () {
-	printf "Now processing key %s (Signerkey %s)\n\n" "$2" "$1"
-	printf "Minimizing key...\n"
-	remove_sigs $2
+	printf "Now processing key %s (Signerkey %s)\n\n" "$1" "$SIGNERKEY"
+	remove_sigs $1
 
 	#TODO: Show fingerprint and ask for match
 
@@ -38,12 +43,15 @@ sign_key () {
 
 	printf "Now processing UIDs\n"
 	
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --with-colons --list-keys $2 | grep ^[up][iu][db]: | while read uid; do
+	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --with-colons --fixed-list-mode --list-keys $1 | grep ^uid: | while read uid; do
 		uid_name=$(echo $uid | cut -d : -f 10)
 		uid_status=$(echo $uid | cut -d : -f 2)
-		sign_uid $1 $2 $current_uid "$uid_name" "$uid_status"
+		sign_uid $1 $current_uid "$uid_name" "$uid_status"
 		current_uid=$(expr $current_uid + 1)
 	done
+
+	printf "\nDone signing key %s\n" "$1"
+	sleep 2
 }
 
 load_key_file (){
@@ -65,7 +73,7 @@ load_key_file (){
 	signee_fp=$(gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep pub | cut -d : -f 5)
 	printf "Detected imported fingerprint %s\n" "$signee_fp"
 
-	sign_key $1 $signee_fp
+	sign_key $signee_fp
 }
 
 load_key_net (){
@@ -87,28 +95,28 @@ load_key_net (){
 	signee_fp=$(gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep pub | cut -d : -f 5)
 	printf "Detected imported fingerprint %s\n" "$signee_fp"
 
-	sign_key $1 $signee_fp
+	sign_key $signee_fp
 }
 
 load_keyring () {
-	#TODO: Import keyring
-	printf "Importing entire keyring\n"
+	printf "Enter path to keyring containing keys to sign: "
 }
+
 printf "Signet v0.1 - Welcome\n"
 
 printf "Setting up environment...\n"
-chmod 700 $SIGNET_TEMP_DIR
-rm $SIGNET_TEMP_DIR/* > /dev/null
-#gpg --no-default-keyring --keyring $PRIVATE_SIGNER_KEYRING --export-ownertrust | gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $PRIVATE_SIGNER_KEYRING --import-ownertrust
+chmod 700 "$SIGNET_TEMP_DIR"
+rm $SIGNET_TEMP_DIR/* > /dev/null 2>&1
+gpg --homedir "$SIGNET_TEMP_DIR" --list-keys
 
 printf "\nAvailable signing keys:\n"
-gpg --no-default-keyring --secret-keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --list-secret-keys | grep "^sec[^#]" 
+gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --secret-keyring "$PRIVATE_SIGNER_KEYRING" --keyring $PUBLIC_SIGNER_KEYRING --list-secret-keys | grep "^sec[^#]" 
 
 printf "\nEnter ID of key to use for signing: "
 read SIGNERKEY
 
 printf "\nSigner key details:\n"
-gpg --no-default-keyring --secret-keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --list-secret-keys $SIGNERKEY
+gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --secret-keyring "$PRIVATE_SIGNER_KEYRING" --keyring "$PUBLIC_SIGNER_KEYRING" --list-secret-keys $SIGNERKEY
 
 
 if [ "$?" = "0" ]; then
@@ -122,9 +130,9 @@ printf "Select signee source:\n\t(k)eyring\n\t(n)et\n\t(f)ile\n"
 read mode
 
 case $mode in
-	k) load_keyring $SIGNERKEY;;
-	n) load_key_net $SIGNERKEY;;
-	f) load_key_file $SIGNERKEY;;
+	k) load_keyring;;
+	n) load_key_net;;
+	f) load_key_file;;
 	*) printf "Could not determine signee source. Aborting.\n";
 	   exit 3;;
 esac

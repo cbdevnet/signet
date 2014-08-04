@@ -1,7 +1,7 @@
 --quiet				Try to be as quiet as possible.
 --batch				Never ask, do not allow interactive commands. gpg might still need to read from STDIN.
 --no-tty			TTY (terminal) is never used for any output.
---fixed-list-mode		
+--fixed-list-mode		Do not merge primary user ID and primary key in --with-colon listing mode
 --no-permission-warning		Suppress the warning about unsafe file and home directory (--homedir) permissions.
 --fingerprint
 --keyid-format long
@@ -9,4 +9,7 @@
 --primary-keyring		Use as primary public keyring. Imported keys (via --import or keyserver --recv-from) will go to this keyring.
 --options file			Read options from file and do not try to read them from the default options file
 --trusted-key longID		Assume that the specified key is as trustworthy as one of your own secret keys.
---no-greeting			Suppress the initial copyright message. 
+--no-greeting			Suppress the initial copyright message.
+--passphrase-fd			Read passphrase from fd. One line only. Can only be used if only one passphrase is supplied. This passphrase only used if --batch
+--with-key-data			Print key listings delimited by colons and print the public key data. 
+
