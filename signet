@@ -4,12 +4,12 @@
 
 remove_sigs () {
 	printf "Minimizing key...\n"
-	printf "minimize\nsave\ny\n" | gpg --command-fd 0 --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --edit-key $1
+	printf "minimize\nsave\ny\n" | gpg --command-fd 0 --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --edit-key $1
 }
 
 save_key () {
 	printf "Saving current status of key %s to %s\n" "$1" "$2"
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --no-emit-version --export --armor $1 > $SIGNET_OUTPUT_DIR/$2
+	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --no-emit-version --export --armor $1 > "$SIGNET_OUTPUT_DIR/$2"
 }
 
 sign_uid () {
@@ -25,7 +25,7 @@ sign_uid () {
 
 	printf "Invoking GPG in order to sign key %s UID %s (%s) with key %s\n" "$1" "$2" "$3" "$SIGNERKEY"
 	#GPG does its own user sanity check
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --secret-keyring $PRIVATE_SIGNER_KEYRING --keyring $PUBLIC_SIGNER_KEYRING --default-key "$SIGNERKEY" $gpgopts --edit-key "$1" uid "$2" sign save < /dev/tty
+	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --primary-keyring "$TEMPORARY_KEYRING" --secret-keyring "$PRIVATE_SIGNER_KEYRING" --keyring "$PUBLIC_SIGNER_KEYRING" --default-key "$SIGNERKEY" $gpgopts --edit-key $1 uid $2 sign save < /dev/tty
 	printf "GPG exit code %s\n" "$?"
 
 	save_key $1 $1_UID$2_by_$SIGNERKEY.sig
@@ -43,7 +43,7 @@ sign_key () {
 
 	printf "Now processing UIDs\n"
 	
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --with-colons --fixed-list-mode --list-keys $1 | grep ^uid: | while read uid; do
+	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --with-colons --fixed-list-mode --list-keys $1 | grep ^uid: | while read uid; do
 		uid_name=$(echo $uid | cut -d : -f 10)
 		uid_status=$(echo $uid | cut -d : -f 2)
 		sign_uid $1 $current_uid "$uid_name" "$uid_status"
@@ -58,7 +58,7 @@ load_key_file (){
 	printf "Enter path to signee public key: "
 	read key_file
 
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --import-options import-minimal --import $key_file
+	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --import-options import-minimal --import "$key_file"
 	if [ "$?" = "0" ]; then
 		printf "Signee key seems to have been imported successfully\n"
 	else
@@ -70,7 +70,7 @@ load_key_file (){
 	fi
 
 	#Get imported key ID
-	signee_fp=$(gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep pub | cut -d : -f 5)
+	signee_fp=$(gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --list-keys --with-colons | grep pub | cut -d : -f 5)
 	printf "Detected imported fingerprint %s\n" "$signee_fp"
 
 	sign_key $signee_fp
@@ -81,7 +81,7 @@ load_key_net (){
 	read signee_fp
 
 	#FIXME: import-options seems to not work with recv-keys
-	gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --import-options import-minimal --keyserver $KEY_SERVER --recv-keys $signee_fp
+	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --import-options import-minimal --keyserver "$KEY_SERVER" --recv-keys "$signee_fp"
 	if [ "$?" = "0" ]; then
 		printf "Signee key seems to have been imported successfully.\n"	
 	else
@@ -92,7 +92,7 @@ load_key_net (){
 		fi
 	fi
 
-	signee_fp=$(gpg --homedir $SIGNET_TEMP_DIR --no-default-keyring --keyring $TEMPORARY_KEYRING --list-keys --with-colons | grep pub | cut -d : -f 5)
+	signee_fp=$(gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --list-keys --with-colons | grep pub | cut -d : -f 5)
 	printf "Detected imported fingerprint %s\n" "$signee_fp"
 
 	sign_key $signee_fp
