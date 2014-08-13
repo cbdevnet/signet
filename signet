@@ -8,8 +8,14 @@ remove_sigs () {
 }
 
 save_key () {
-	printf "Saving current status of key %s to %s\n" "$1" "$2"
-	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --no-emit-version --export --armor $1 > "$SIGNET_OUTPUT_DIR/$2"
+	printf "Exporting key %s\n" "$1"
+	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --no-emit-version --export --armor $1 | if [ "$ENCRYPT_SIGNATURES" = "n" ]; then
+		printf "Saving to %s\n" "$2"
+      		tee "$SIGNET_OUTPUT_DIR/$2" > /dev/null 
+	else	
+		printf "Encrypting to %s\n" "$2"
+		gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --keyring "$PUBLIC_SIGNER_KEYRING" --always-trust --no-emit-version --armor --encrypt --recipient "$1" --recipient "$SIGNERKEY" > "$SIGNET_OUTPUT_DIR/$2" 
+	fi
 }
 
 sign_uid () {
