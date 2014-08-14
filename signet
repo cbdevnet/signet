@@ -32,7 +32,14 @@ sign_uid () {
 	printf "Invoking GPG in order to sign key %s UID %s (%s) with key %s\n" "$1" "$2" "$3" "$SIGNERKEY"
 	#GPG does its own user sanity check
 	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --primary-keyring "$TEMPORARY_KEYRING" --secret-keyring "$PRIVATE_SIGNER_KEYRING" --keyring "$PUBLIC_SIGNER_KEYRING" --default-key "$SIGNERKEY" $gpgopts --edit-key $1 uid $2 sign save < /dev/tty
-	printf "GPG exit code %s\n" "$?"
+
+	if [ "$?" != "0" ]; then
+		printf "GPG reported a problem while signing this UID. Abort? (y/n): "
+		read action < /dev/tty
+		if [ "$action" = "y" ]; then
+			exit 6
+		fi
+	fi
 
 	save_key $1 $1_UID$2_by_$SIGNERKEY.sig
 	sleep 2
@@ -133,6 +140,17 @@ printf "Setting up environment...\n"
 chmod 700 "$SIGNET_TEMP_DIR"
 rm $SIGNET_TEMP_DIR/* > /dev/null 2>&1
 gpg --homedir "$SIGNET_TEMP_DIR" --list-keys
+if [ "$CHECK_AGENT_INFO" = "y" ]; then
+	if [ -n "$GPG_AGENT_INFO" ]; then
+		printf "Using GPG agent with info %s" "$GPG_AGENT_INFO"
+	else
+		printf "\nGPG_AGENT_INFO not set. GPG might not be able to communicate with the agent.\nAbort? (y/n): "
+		read action
+		if [ "$action" = "y" ]; then
+			exit 4
+		fi
+	fi
+fi
 
 printf "\nAvailable signing keys:\n"
 gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --secret-keyring "$PRIVATE_SIGNER_KEYRING" --keyring $PUBLIC_SIGNER_KEYRING --list-secret-keys | grep "^sec[^#]" 
@@ -151,7 +169,7 @@ else
 	exit 2
 fi
 
-printf "Select signee source:\n\t(k)eyring\n\t(n)et\n\t(f)ile\n"
+printf "Select signee source:\n\t(k)eyring (signs all keys on ring)\n\t(n)et (signs one key from a keyserver)\n\t(f)ile (signs one key imported from a file)\n"
 read mode
 
 case $mode in
