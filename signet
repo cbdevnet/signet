@@ -137,6 +137,14 @@ load_keyring () {
 printf "Signet v0.1 - Welcome\n"
 
 printf "Setting up environment...\n"
+if [ ! -d "$SIGNET_TEMP_DIR" ]; then
+	printf "Creating temporary directory\n"
+	mkdir "$SIGNET_TEMP_DIR"
+fi
+if [ ! -d "$SIGNET_OUTPUT_DIR" ]; then
+	printf "Creating output directory\n"
+	mkdir "$SIGNET_OUTPUT_DIR"
+fi
 chmod 700 "$SIGNET_TEMP_DIR"
 rm $SIGNET_TEMP_DIR/* > /dev/null 2>&1
 gpg --homedir "$SIGNET_TEMP_DIR" --list-keys

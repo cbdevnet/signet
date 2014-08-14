@@ -30,3 +30,12 @@ Thereafter, UIDs are individually brought before the
 user to sign or reject to do so, and then exported
 signature for signature into their own files
 suitable for emailing to the respective UIDs.
+
+Using gpg-agent in order to provide the passphrase
+only once should work pretty well.
+
+I'll happily receive Problems, bugs, ideas and praise
+via email to cb@cbcdn.com :)
+
+Many thanks to neun and sycoso for beta-testing and
+pointing out flaws!
