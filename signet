@@ -21,6 +21,12 @@ save_key () {
 sign_uid () {
 	clear
 
+	if [ "$4" = "r" ]; then
+		printf "Key %s UID %s (%s) was revoked, so not signing\n" "$1" "$2" "$3"
+		sleep 2
+		return 0
+	fi
+
 	if [ -n "$SIGNING_POLICY_URL" ]; then
 		gpgopts="--sig-policy-url $SIGNING_POLICY_URL "
 	fi

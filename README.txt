@@ -31,7 +31,7 @@ user to sign or reject to do so, and then exported
 signature for signature into their own files
 suitable for emailing to the respective UIDs.
 
-Using gpg-agent in order to provide the passphrase
+Using gpg-agent to provide the passphrase
 only once should work pretty well.
 
 I'll happily receive Problems, bugs, ideas and praise
