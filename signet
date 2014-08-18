@@ -47,7 +47,11 @@ sign_uid () {
 		fi
 	fi
 
-	save_key $1 $1_UID$2_by_$SIGNERKEY.sig
+	if [ "$UIDS_AS_FILENAMES" = "y" ]; then
+		save_key $1 "$1_UID$2_$3_by_$SIGNERKEY.sig"
+	else
+		save_key $1 "$1_UID$2_by_$SIGNERKEY.sig"
+	fi
 	sleep 2
 	remove_sigs $1
 }
