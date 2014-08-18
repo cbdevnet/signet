@@ -39,3 +39,9 @@ via email to cb@cbcdn.com :)
 
 Many thanks to neun and sycoso for beta-testing and
 pointing out flaws!
+
+UPDATES/SUPPORT
+---------------
+Updates may be found at github.com/cbdevnet/signet
+Bugs, ideas, praise and patches I happily receive
+via email to cb@cbcdn.com :)
