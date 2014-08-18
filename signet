@@ -18,6 +18,10 @@ save_key () {
 	fi
 }
 
+store_mailhelper(){
+	printf "%s\t%s\n" "$1" "$2" >> "$SIGNET_OUTPUT_DIR/$MAILHELPER_FILE"
+}
+
 sign_uid () {
 	clear
 
@@ -48,12 +52,19 @@ sign_uid () {
 	fi
 
 	if [ "$UIDS_AS_FILENAMES" = "y" ]; then
-		save_key $1 "$1_UID$2_$3_by_$SIGNERKEY.sig"
+		filename="$1_UID$2_$3_by_$SIGNERKEY.sig"
 	else
-		save_key $1 "$1_UID$2_by_$SIGNERKEY.sig"
+		filename="$1_UID$2_by_$SIGNERKEY.sig"
 	fi
+
+	save_key "$1" "$filename"
+
+	if [ "$GENERATE_MAILHELPER_FILE" = "y" ]; then
+		store_mailhelper "$filename" "$3"
+	fi
+
 	sleep 2
-	remove_sigs $1
+	remove_sigs "$1"
 }
 
 sign_key () {
