@@ -11,15 +11,37 @@ save_key () {
 	printf "Exporting key %s\n" "$1"
 	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --no-emit-version --export --armor $1 | if [ "$ENCRYPT_SIGNATURES" = "n" ]; then
 		printf "Saving to %s\n" "$2"
-      		tee "$SIGNET_OUTPUT_DIR/$2" > /dev/null 
-	else	
+      		tee "$SIGNET_OUTPUT_DIR/$2" > /dev/null
+	else
 		printf "Encrypting to %s\n" "$2"
-		gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --keyring "$PUBLIC_SIGNER_KEYRING" --always-trust --no-emit-version --armor --encrypt --recipient "$1" --recipient "$SIGNERKEY" > "$SIGNET_OUTPUT_DIR/$2" 
+		gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --keyring "$PUBLIC_SIGNER_KEYRING" --always-trust --no-emit-version --armor --encrypt --recipient "$1" --recipient "$SIGNERKEY" > "$SIGNET_OUTPUT_DIR/$2"
 	fi
 }
 
 store_mailhelper(){
 	printf "%s\t%s\n" "$1" "$2" >> "$SIGNET_OUTPUT_DIR/$MAILHELPER_FILE"
+}
+
+store_mbox(){
+	(
+		BOUNDARY="SIGNET-MULTIPART-BOUNDARY"
+		printf "From %s %s\n" "$MBOX_SENDER" "$(date --utc)"
+		printf "Date: %s\n" "$(date --rfc-2822)"
+		printf "From: %s\n" "$MBOX_SENDER"
+		printf "To: %s\n" "$2"
+		printf "Subject: %s\n" "$MBOX_MAIL_SUBJECT"
+		printf "MIME-Version: 1.0\n"
+		printf "Content-Type: multipart/mixed; boundary=\"%s\"\n" "$BOUNDARY"
+		printf "\n--%s\n" "$BOUNDARY"
+		printf "Content-Type: text/plain\n"
+		printf "\n%s" "$MBOX_MAIL_BODY"
+		printf "\n--%s\n" "$BOUNDARY"
+		printf "Content-Type: application/pgp-signature\n"
+		printf "Content-Transfer-Encoding: base64\n"
+		printf "Content-Disposition: attachment\n"
+		printf "\n%s" "$(base64 "$SIGNET_OUTPUT_DIR/$1")"
+		printf "\n--%s\n\n" "$BOUNDARY"
+	) >> "$SIGNET_OUTPUT_DIR/$MBOX_FILE"
 }
 
 sign_uid () {
@@ -63,24 +85,28 @@ sign_uid () {
 		store_mailhelper "$filename" "$3"
 	fi
 
+	if [ "$GENERATE_MBOX" = "y" ]; then
+		store_mbox "$filename" "$3"
+	fi
+
 	sleep 2
 	remove_sigs "$1"
 }
 
 sign_key () {
 	printf "Now processing key %s (Signerkey %s)\n\n" "$1" "$SIGNERKEY"
-	remove_sigs $1
+	remove_sigs "$1"
 
 	#TODO: Show fingerprint and ask for match
 
 	current_uid=1
 
 	printf "Now processing UIDs\n"
-	
+
 	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --with-colons --fixed-list-mode --list-keys $1 | grep ^uid: | while read uid; do
-		uid_name=$(echo $uid | cut -d : -f 10)
-		uid_status=$(echo $uid | cut -d : -f 2)
-		sign_uid $1 $current_uid "$uid_name" "$uid_status"
+		uid_name=$(echo "$uid" | cut -d : -f 10)
+		uid_status=$(echo "$uid" | cut -d : -f 2)
+		sign_uid "$1" "$current_uid" "$uid_name" "$uid_status"
 		current_uid=$(expr $current_uid + 1)
 	done
 
@@ -107,7 +133,7 @@ load_key_file (){
 	signee_fp=$(gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --list-keys --with-colons | grep pub | cut -d : -f 5)
 	printf "Detected imported fingerprint %s\n" "$signee_fp"
 
-	sign_key $signee_fp
+	sign_key "$signee_fp"
 }
 
 load_key_net (){
@@ -117,7 +143,7 @@ load_key_net (){
 	#FIXME: import-options seems to not work with recv-keys
 	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --import-options import-minimal --keyserver "$KEY_SERVER" --recv-keys "$signee_fp"
 	if [ "$?" = "0" ]; then
-		printf "Signee key seems to have been imported successfully.\n"	
+		printf "Signee key seems to have been imported successfully.\n"
 	else
 		printf "GPG reported an error fetching/importing the key. Abort? (y/n): "
 		read action
@@ -151,11 +177,11 @@ load_keyring () {
 
 	printf "Iterating over keys...\n"
 	gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --keyring "$TEMPORARY_KEYRING" --list-keys --with-colons | grep "^pub:" | cut -d : -f 5 | while read signee; do
-		sign_key $signee
+		sign_key "$signee"
 	done
 }
 
-printf "Signet v0.1 - Welcome\n"
+printf "Signet v0.2 - Welcome\n"
 
 printf "Setting up environment...\n"
 if [ ! -d "$SIGNET_TEMP_DIR" ]; then
@@ -167,7 +193,10 @@ if [ ! -d "$SIGNET_OUTPUT_DIR" ]; then
 	mkdir "$SIGNET_OUTPUT_DIR"
 fi
 chmod 700 "$SIGNET_TEMP_DIR"
-rm $SIGNET_TEMP_DIR/* > /dev/null 2>&1
+rm -rf $SIGNET_TEMP_DIR/* > /dev/null 2>&1
+if [ -n "$PRIVATE_SIGNER_KEYDIR" ]; then
+	ln -s "$PRIVATE_SIGNER_KEYDIR" "$SIGNET_TEMP_DIR"
+fi
 gpg --homedir "$SIGNET_TEMP_DIR" --list-keys
 if [ "$CHECK_AGENT_INFO" = "y" ]; then
 	if [ -n "$GPG_AGENT_INFO" ]; then
@@ -182,7 +211,7 @@ if [ "$CHECK_AGENT_INFO" = "y" ]; then
 fi
 
 printf "\nAvailable signing keys:\n"
-gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --secret-keyring "$PRIVATE_SIGNER_KEYRING" --keyring $PUBLIC_SIGNER_KEYRING --list-secret-keys | grep "^sec[^#]" 
+gpg --homedir "$SIGNET_TEMP_DIR" --no-default-keyring --secret-keyring "$PRIVATE_SIGNER_KEYRING" --keyring "$PUBLIC_SIGNER_KEYRING" --list-secret-keys | grep "^sec[^#]" --after 1
 
 printf "\nEnter ID of key to use for signing: "
 read SIGNERKEY

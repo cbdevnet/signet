@@ -8,6 +8,13 @@ options.
 Basically, signet is a shell wrapper around
 numerous calls to gpg itself.
 
+WARNING
+-------
+Due to breakages introduced with the GnuPG 2.1,
+signet v0.2 breaks compatability to older versions
+of GnuPG. These older versions should still work
+with signet v0.1
+
 GOAL
 ----
 Have an easy way to sign keys on online as well

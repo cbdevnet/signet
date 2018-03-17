@@ -1,2 +1,4 @@
 *.asc
 *.pgp
+data/
+output/
